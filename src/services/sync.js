@@ -116,7 +116,7 @@ export const sync = async (options = {}) => {
   const { since, full } = options;
 
   try {
-    const stravaClient = createStravaClient();
+    const stravaClient = await createStravaClient();
 
     await stravaClient.loadFromDb();
 

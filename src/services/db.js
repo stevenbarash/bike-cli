@@ -65,7 +65,23 @@ export const upsertStravaToken = (data, athleteId, accessToken, refreshToken, ex
   }
 };
 
-export const getStravaToken = (data, athleteId) => data.stravaTokens.find((t) => t.athleteId === athleteId) || null;
+export const getStravaToken = (data, athleteId) => {
+  if (athleteId === null || athleteId === undefined) {
+    if (!data.stravaTokens.length) {
+      return null;
+    }
+    return data.stravaTokens.reduce((latest, token) => {
+      if (!latest) {
+        return token;
+      }
+      const latestTime = Date.parse(latest.updatedAt || latest.createdAt || "") || 0;
+      const tokenTime = Date.parse(token.updatedAt || token.createdAt || "") || 0;
+      return tokenTime >= latestTime ? token : latest;
+    }, null);
+  }
+
+  return data.stravaTokens.find((t) => t.athleteId === athleteId) || null;
+};
 
 export const deleteStravaToken = (data, athleteId) => {
   data.stravaTokens = data.stravaTokens.filter((t) => t.athleteId !== athleteId);
@@ -214,7 +230,7 @@ export const getMaintenanceEvents = (data, bikeId, since) => {
 
 export const modifyData = async (modifier) => {
   const data = await loadData();
-  modifier(data);
+  await modifier(data);
   await saveData(data);
   return data;
 };

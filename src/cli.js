@@ -967,7 +967,7 @@ export const run = async () => {
       try {
         await initializeData();
 
-        const stravaClient = createStravaClient();
+        const stravaClient = await createStravaClient();
         const result = await stravaClient.authorize();
 
         const theme = createTheme({ colorEnabled: process.stdout.isTTY });
@@ -990,11 +990,11 @@ export const run = async () => {
         const config = await loadConfig();
         await initializeData();
 
-        const stravaClient = createStravaClient();
+        const stravaClient = await createStravaClient();
         const data = await loadData();
-        const token = getStravaToken(data, 0);
+        const token = getStravaToken(data, stravaClient.athleteId);
 
-        const theme = createTheme({ colorEnabled: options.color && process.stdout.isTTY });
+        const theme = createTheme({ colorEnabled: auth.opts().color && process.stdout.isTTY });
         if (!token) {
           const output = renderConfigSummary({
             title: "Authentication",

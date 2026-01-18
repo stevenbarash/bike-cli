@@ -89,53 +89,68 @@ const findOpenPort = async () => {
   });
 };
 
-const createCallbackServer = (port) => {
-  return new Promise((resolve, reject) => {
+const createCallbackServer = (port, timeoutMs = 120000) =>
+  new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       const url = new URL(req.url, `http://localhost:${port}`);
 
-      if (url.pathname === "/callback") {
-        const code = url.searchParams.get("code");
-        const error = url.searchParams.get("error");
-
-        if (error) {
-          res.writeHead(400, { "Content-Type": "text/plain" });
-          res.end(`OAuth error: ${error}`);
-          reject(new Error(`OAuth error: ${error}`));
-          return;
-        }
-
-        if (code) {
-          res.writeHead(200, { "Content-Type": "text/html" });
-          res.end(`
-            <html>
-              <head><title>Strava Auth Complete</title></head>
-              <body>
-                <h1>Authorization successful!</h1>
-                <p>You can close this window and return to the terminal.</p>
-              </body>
-            </html>
-          `);
-          resolve(code);
-        } else {
-          res.writeHead(400, { "Content-Type": "text/plain" });
-          res.end("Missing authorization code");
-          reject(new Error("Missing authorization code"));
-        }
+      if (url.pathname !== "/callback") {
+        res.writeHead(404, { "Content-Type": "text/plain" });
+        res.end("Not found");
+        return;
       }
+
+      const code = url.searchParams.get("code");
+      const error = url.searchParams.get("error");
+
+      const finish = (callback) => {
+        clearTimeout(timeout);
+        server.close(() => callback());
+      };
+
+      if (error) {
+        res.writeHead(400, { "Content-Type": "text/plain" });
+        res.end(`OAuth error: ${error}`);
+        finish(() => reject(new Error(`OAuth error: ${error}`)));
+        return;
+      }
+
+      if (code) {
+        res.writeHead(200, { "Content-Type": "text/html" });
+        res.end(`
+          <html>
+            <head><title>Strava Auth Complete</title></head>
+            <body>
+              <h1>Authorization successful!</h1>
+              <p>You can close this window and return to the terminal.</p>
+            </body>
+          </html>
+        `);
+        finish(() => resolve(code));
+        return;
+      }
+
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Missing authorization code");
+      finish(() => reject(new Error("Missing authorization code")));
     });
+
+    const timeout = setTimeout(() => {
+      server.close(() => reject(new Error("Authorization timeout")));
+    }, timeoutMs);
 
     server.listen(port, "127.0.0.1", (err) => {
       if (err) {
+        clearTimeout(timeout);
         reject(err);
-      } else {
-        resolve(server);
       }
     });
 
-    server.on("error", reject);
+    server.on("error", (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
   });
-};
 
 export class StravaClient {
   constructor(credentials) {
@@ -199,14 +214,7 @@ export class StravaClient {
     );
 
     try {
-      const [code] = await Promise.all([
-        createCallbackServer(port),
-        new Promise((resolve) => setTimeout(resolve, 120000)),
-      ]);
-
-      if (!code) {
-        throw new Error("Authorization timeout");
-      }
+      const code = await createCallbackServer(port);
 
       const tokens = await exchangeCodeForToken({
         clientId: this.clientId,
@@ -348,8 +356,9 @@ export class StravaClient {
   }
 }
 
-export const createStravaClient = () => {
-  const credentials = getStravaCredentials({ loadConfig });
+export const createStravaClient = async () => {
+  const config = await loadConfig();
+  const credentials = getStravaCredentials(config);
   if (!credentials) {
     throw new Error(
       "Strava credentials not configured. Set them in config or env vars:\n  bike config set strava.clientId YOUR_ID\n  bike config set strava.clientSecret YOUR_SECRET\n\nOr use env vars: BIKE_STRAVA_CLIENT_ID, BIKE_STRAVA_CLIENT_SECRET"
