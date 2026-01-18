@@ -153,13 +153,15 @@ bike config get strava.clientId
 
 #### `bike config set <key> <value>`
 
-Set a configuration value.
+Set a configuration value. Supports nested keys using dot notation.
 
 ```bash
 bike config set location "San Francisco, CA"
 bike config set units metric
 bike config set profile commuter
 bike config set defaultBikeId <uuid>
+bike config set strava.clientId YOUR_CLIENT_ID
+bike config set strava.clientSecret YOUR_CLIENT_SECRET
 ```
 
 #### `bike config list`
@@ -672,14 +674,16 @@ Stored in: `~/.config/bike-cli/data.json`
 
 ### Configuring bike-cli
 
-Option 1: Using config file
+You can configure Strava credentials using either the CLI config file or environment variables.
+
+**Using config file (recommended):**
 
 ```bash
 bike config set strava.clientId YOUR_CLIENT_ID
 bike config set strava.clientSecret YOUR_CLIENT_SECRET
 ```
 
-Option 2: Using environment variables
+**Using environment variables:**
 
 ```bash
 export BIKE_STRAVA_CLIENT_ID=YOUR_CLIENT_ID
