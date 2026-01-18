@@ -1,0 +1,23 @@
+{
+  "name": "bike-cli",
+  "version": "0.1.0",
+  "description": "Cycling utility CLI: weather guidance, Strava sync, training, and maintenance",
+  "type": "module",
+  "bin": {
+    "bike": "./bin/bike.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node ./bin/bike.js"
+  },
+  "dependencies": {
+    "boxen": "^7.1.1",
+    "chalk": "^5.3.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^11.1.0",
+    "ora": "^8.0.1",
+    "sql.js": "^1.10.3"
+  }
+}
