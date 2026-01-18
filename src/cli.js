@@ -20,6 +20,7 @@ import {
 import {
   loadConfig,
   updateConfig,
+  saveConfig,
   getConfigDefaults,
   getEffectiveDbPath,
 } from "./services/config.js";
@@ -87,6 +88,36 @@ const normalizeTtl = (ttl) => {
     throw new Error("TTL must be a positive number of minutes.");
   }
   return value;
+};
+
+const setNestedValue = (obj, keyPath, value) => {
+  const keys = keyPath.split(".");
+  let current = obj;
+
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i];
+    if (!(key in current)) {
+      current[key] = {};
+    }
+    current = current[key];
+  }
+
+  current[keys[keys.length - 1]] = value;
+};
+
+const getNestedValue = (obj, keyPath) => {
+  const keys = keyPath.split(".");
+  let current = obj;
+
+  for (const key of keys) {
+    if (current && typeof current === "object" && key in current) {
+      current = current[key];
+    } else {
+      return undefined;
+    }
+  }
+
+  return current;
 };
 
 const padNumber = (value) => String(value).padStart(2, "0");
@@ -792,13 +823,15 @@ export const run = async () => {
     .description("Read a single config value")
     .action(async (key) => {
       const current = await loadConfig();
-      if (!(key in current)) {
+      const value = getNestedValue(current, key);
+
+      if (value === undefined) {
         program.error(`Unknown key: ${key}`);
         return;
       }
       const output = renderConfigValue({
         key,
-        value: current[key],
+        value,
         theme: createTheme({ colorEnabled: process.stdout.isTTY }),
       });
       process.stdout.write(`${output}\n`);
@@ -809,17 +842,31 @@ export const run = async () => {
     .description("Set a config value")
     .action(async (key, value) => {
       const defaults = getConfigDefaults();
-      if (!(key in defaults)) {
+      const existingValue = getNestedValue(defaults, key);
+
+      if (existingValue === undefined) {
         program.error(`Unknown key: ${key}`);
         return;
       }
       if (key === "units") {
         normalizeUnits(value);
       }
-      const updated = await updateConfig({ [key]: value });
+
+      const current = await loadConfig();
+      const next = { ...current };
+
+      if (key.includes(".")) {
+        setNestedValue(next, key, value);
+      } else {
+        next[key] = value;
+      }
+
+      await saveConfig(next);
+
+      const newValue = getNestedValue(next, key);
       const output = renderConfigValue({
         key,
-        value: updated[key],
+        value: newValue,
         theme: createTheme({ colorEnabled: process.stdout.isTTY }),
       });
       process.stdout.write(`${output}\n`);
